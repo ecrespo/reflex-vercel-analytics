@@ -1,0 +1,131 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+# github.workflow is the caller's name when Publish runs this via workflow_call, so a push
+# to the same ref never cancels the CI stage of a publication (and vice versa).
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.workflow == 'CI' }}
+
+env:
+  UV_VERSION: "0.11.7"
+
+jobs:
+  lint:
+    name: pre-commit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: "3.12"
+      - name: uv.lock is up to date
+        run: uv lock --check
+      - run: uv sync --locked
+      - name: Cache pre-commit environments
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/pre-commit
+          key: pre-commit-${{ hashFiles('.pre-commit-config.yaml') }}
+      # pytest runs in the test matrix below, so skip the pre-push stage here.
+      - run: uv run pre-commit run --all-files --show-diff-on-failure --hook-stage pre-commit
+
+  test:
+    name: pytest (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: ${{ matrix.python-version }}
+          enable-cache: true
+      - run: uv sync --locked
+      - run: uv run pytest
+
+  build:
+    name: build + smoke test distributions
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: "3.12"
+          enable-cache: true
+      - run: uv build
+      - name: Check metadata renders on PyPI
+        run: uvx twine check --strict dist/*
+      - name: Check the wheel ships the JSX bridge and type stubs
+        run: |
+          unzip -l dist/*.whl | tee /tmp/wheel.txt
+          for f in vercel_analytics.jsx vercel_analytics.pyi py.typed; do
+            grep -q "reflex_vercel_analytics/$f" /tmp/wheel.txt || { echo "::error::$f missing from wheel"; exit 1; }
+          done
+      # Install each distribution in a throwaway environment (never the source tree) and use it.
+      - name: Smoke-test the wheel
+        run: uv run --isolated --no-project --with dist/*.whl python -I scripts/smoke_test.py --version "$(uv version --short)"
+      - name: Smoke-test the sdist
+        run: uv run --isolated --no-project --with dist/*.tar.gz python -I scripts/smoke_test.py --version "$(uv version --short)"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ci-dist
+          path: dist/
+          retention-days: 7
+          if-no-files-found: error
+
+  stubs:
+    name: vercel_analytics.pyi is current
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: "3.12"
+          enable-cache: true
+      - run: uv sync --locked
+      - run: uv run python scripts/generate_pyi.py
+      - name: Fail if the stub changed
+        run: |
+          git diff --exit-code -- custom_components/ || {
+            echo "::error::vercel_analytics.pyi is stale: run 'uv run python scripts/generate_pyi.py' and commit it"
+            exit 1
+          }
+
+  demo:
+    name: demo app compiles
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: "3.12"
+          enable-cache: true
+      - run: uv sync --locked
+      - name: reflex compile
+        working-directory: vercel_analytics_demo
+        run: uv run reflex compile --no-rich
+      - name: The bridge and the pinned SDK reach the compiled frontend
+        working-directory: vercel_analytics_demo
+        run: |
+          version=$(uv run python -c "from reflex_vercel_analytics import VERCEL_ANALYTICS_VERSION as v; print(v)")
+          test -f .web/public/external/reflex_vercel_analytics/vercel_analytics/vercel_analytics.jsx \
+            || { echo "::error::JSX bridge was not copied into .web"; exit 1; }
+          grep -q "\"@vercel/analytics\": *\"$version\"" .web/package.json \
+            || { echo "::error::@vercel/analytics@$version missing from .web/package.json"; exit 1; }

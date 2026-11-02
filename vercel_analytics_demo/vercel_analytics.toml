@@ -1,0 +1,26 @@
+# Vercel Web Analytics configuration for the demo app.
+#
+# Loaded by `rva.install(app)` from the directory where `reflex run` starts.
+# Every field can be overridden with an environment variable named
+# VERCEL_ANALYTICS_<FIELD>:
+#
+#   VERCEL_ANALYTICS_MODE=production reflex run --env prod
+
+# "development" loads Vercel's debug script: every page view and event is
+# printed to the browser console and nothing is sent. "auto" picks
+# development under `reflex run` and production under `--env prod`.
+mode = "development"
+debug = true
+
+# One page view per client-side navigation, with the route template
+# (/post/[pid]) instead of the concrete path.
+track_page_views = true
+
+# Keep "?query" in the reported URL, but redact these parameters.
+include_search = true
+redact_search_params = ["token", "email"]
+
+# Routes never reported. "/x" is exact, "/x/*" is a prefix.
+exclude_paths = ["/admin/*"]
+
+respect_do_not_track = false
