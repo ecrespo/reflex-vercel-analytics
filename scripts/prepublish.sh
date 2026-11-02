@@ -28,7 +28,7 @@ step "vercel_analytics.pyi matches the component"
 STUB=custom_components/reflex_vercel_analytics/vercel_analytics.pyi
 BACKUP="$(mktemp)"
 cp "$STUB" "$BACKUP"
-uv run python scripts/generate_pyi.py >/dev/null
+uv run --python 3.13 python scripts/generate_pyi.py >/dev/null
 if ! cmp -s "$STUB" "$BACKUP"; then
   diff -u "$BACKUP" "$STUB" || true
   echo "error: $STUB is stale; the regenerated version is now in place, review and commit it" >&2

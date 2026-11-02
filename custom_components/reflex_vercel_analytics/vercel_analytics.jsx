@@ -95,7 +95,11 @@ const routeParams = (params) => {
   return Object.keys(out).length ? out : null;
 };
 
-/** Apply `includeSearch` / `redactSearchParams` to a URL string. */
+/**
+ * Apply `includeSearch` / `redactSearchParams` to a URL string. The fragment is always
+ * dropped: it is never needed for analytics and is where OAuth implicit flows and magic
+ * links put tokens (`#access_token=...`).
+ */
 const filterUrl = (raw) => {
   let url;
   try {
@@ -103,6 +107,7 @@ const filterUrl = (raw) => {
   } catch (_error) {
     return raw;
   }
+  url.hash = "";
   if (!state.includeSearch) {
     url.search = "";
   } else if (state.redactSearchParams.length && url.search) {

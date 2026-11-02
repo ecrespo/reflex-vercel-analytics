@@ -13,7 +13,8 @@ First release.
 - `mode = "auto"` resolved from the Reflex run mode (`development` under `reflex run`, `production` with
   `--env prod` / `reflex export`).
 - Automatic page views on React Router navigation with the route template (`/post/[pid]`), `exclude_paths`,
-  `include_search` and `redact_search_params` enforced through `beforeSend`.
+  `include_search` and `redact_search_params` enforced through `beforeSend`; the URL fragment is always
+  stripped so tokens in `#access_token=...` never reach Vercel.
 - Actions: `track` (with feature `flags`), `page_view`, `opt_out`, `opt_in`, `get_status`,
   `validate_event_name`, `validate_properties`.
 - `respect_do_not_track`, and the `on_ready`, `on_page_view` and `on_event` triggers.

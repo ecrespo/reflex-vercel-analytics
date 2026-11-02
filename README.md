@@ -156,7 +156,7 @@ With `track_page_views = false` the bridge sends nothing itself and the injected
 ## Privacy
 
 - `exclude_paths`: navigations to these routes are not queued at all, and events fired while on them are dropped by `beforeSend`.
-- `include_search = false` removes the query string from every reported URL; `redact_search_params` keeps the query string but replaces the listed values with `[redacted]` (Vercel's [recommendation for sensitive data](https://vercel.com/docs/analytics/redacting-sensitive-data)).
+- `include_search = false` removes the query string from every reported URL; `redact_search_params` keeps the query string but replaces the listed values with `[redacted]` (Vercel's [recommendation for sensitive data](https://vercel.com/docs/analytics/redacting-sensitive-data)). The URL fragment (`#...`) is always removed, since OAuth implicit flows and magic links carry tokens there.
 - `rva.opt_out()` sets a localStorage flag; from then on `beforeSend` returns `null` for every event until `rva.opt_in()`.
 - `respect_do_not_track = true` skips the injection entirely when the browser sends `DNT: 1` or Global Privacy Control.
 
@@ -238,7 +238,7 @@ uv pip install -e .
 uv run pre-commit install --install-hooks   # ruff, uv.lock and file checks on commit; pytest on push
 uv run pytest
 uv run ruff check .
-uv run python scripts/generate_pyi.py       # regenerate vercel_analytics.pyi after changing props
+uv run --python 3.13 python scripts/generate_pyi.py       # regenerate vercel_analytics.pyi after changing props
 uv build                                    # sdist + wheel in dist/
 ```
 

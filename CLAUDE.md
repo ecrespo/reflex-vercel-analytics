@@ -16,7 +16,7 @@ uv run pytest                            # all tests (testpaths = tests, -q --st
 uv run pytest tests/test_config.py::test_name   # single test
 uv run ruff check .                      # lint (line-length 110, py310 target; .pyi excluded)
 uv run ruff format .
-uv run python scripts/generate_pyi.py    # regenerates vercel_analytics.pyi (`reflex component build` is gone in Reflex 0.10)
+uv run --python 3.13 python scripts/generate_pyi.py    # regenerates vercel_analytics.pyi (`reflex component build` is gone in Reflex 0.10)
 uv build                                 # sdist/wheel into dist/
 scripts/prepublish.sh [vX.Y.Z]           # local pre-publication gate: CI checks + build + smoke tests, no upload
 uv run python scripts/check_release.py --tag vX.Y.Z --check-pypi  # release metadata guard used by publish.yml
@@ -41,7 +41,7 @@ Shared constants (SDK version, `BROWSER_API`, env prefix, modes, limits, app-wra
 
 ## Conventions
 
-- Adding/changing a component prop: update the `Var` in `vercel_analytics.py`, the JSX destructuring/handling, `VercelAnalyticsConfig` + `to_props()` if it's configurable from file, then regenerate `vercel_analytics.pyi` with `uv run python scripts/generate_pyi.py` (the `.pyi` is generated, don't hand-edit). `tests/test_component.py` asserts props compile to the camelCase names the bridge expects.
+- Adding/changing a component prop: update the `Var` in `vercel_analytics.py`, the JSX destructuring/handling, `VercelAnalyticsConfig` + `to_props()` if it's configurable from file, then regenerate `vercel_analytics.pyi` with `uv run --python 3.13 python scripts/generate_pyi.py` (the `.pyi` is generated, don't hand-edit). `tests/test_component.py` asserts props compile to the camelCase names the bridge expects.
 - Public API is re-exported explicitly in `__init__.py` (`__all__`); keep both lists updated.
 - Bumping @vercel/analytics requires changing `VERCEL_ANALYTICS_VERSION` (tests assert the pinned value) and re-checking the `/react` adapter's props in `node_modules/@vercel/analytics/dist/react/index.d.ts`.
 - Version lives only in `pyproject.toml` (`__version__` reads installed metadata); record releases in `CHANGELOG.md`.
